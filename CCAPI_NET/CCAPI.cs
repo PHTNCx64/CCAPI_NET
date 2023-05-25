@@ -219,7 +219,7 @@ public unsafe class CCAPI
             return -1;
         }
 
-        byte* ptrId = stackalloc byte[32];
+        byte* ptrId = stackalloc byte[16];
         HexStringToByteArray(Id, ptrId);
         return CCAPISetConsoleIdsPtr((int)idType, ptrId);
     }
@@ -257,7 +257,7 @@ public unsafe class CCAPI
             return -1;
         }
 
-        byte* ptrId = stackalloc byte[32];
+        byte* ptrId = stackalloc byte[16];
         HexStringToByteArray(Id, ptrId);
         return CCAPISetBootConsoleIdsPtr((int)type, disableBootId ? 1 : 0, ptrId);
     }
