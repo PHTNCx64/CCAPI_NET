@@ -441,8 +441,8 @@ public unsafe class CCAPI
 
             ptrCcapi[0] = (byte)(((ccapi / 100) % 10) + 0x30);
             ptrCcapi[1] = 0x2E;
-            ptrCcapi[2] = (byte)(((ccapi / 100) % 10) + 0x30);
-            ptrCcapi[3] = (byte)(((ccapi / 100) % 10) + 0x30);
+            ptrCcapi[2] = (byte)(((ccapi / 10) % 10) + 0x30);
+            ptrCcapi[3] = (byte)(((ccapi % 10) + 0x30));
 
             ccapiVersion = Encoding.ASCII.GetString(ptrCcapi, 4);
 
