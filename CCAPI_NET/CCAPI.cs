@@ -43,6 +43,9 @@ public unsafe class CCAPI
     private readonly delegate* unmanaged[Cdecl]<int, byte*, byte*, void> CCAPIGetConsoleInfoPtr;
     private readonly delegate* unmanaged[Cdecl]<int> CCAPIGetDllVersionPtr;
 
+    private readonly byte[] UTF16HexTable;
+
+
     public CCAPI(string? libraryPath)
     {
         if (!OperatingSystem.IsWindows())
@@ -91,6 +94,30 @@ public unsafe class CCAPI
                 CCAPIGetNumberOfConsolesPtr = (delegate* unmanaged[Cdecl]<int>)NativeLibrary.GetExport(CCAPIHandle, "CCAPIGetNumberOfConsoles");
                 CCAPIGetConsoleInfoPtr = (delegate* unmanaged[Cdecl]<int, byte*, byte*, void>)NativeLibrary.GetExport(CCAPIHandle, "CCAPIGetConsoleInfo");
                 CCAPIGetDllVersionPtr = (delegate* unmanaged[Cdecl]<int>)NativeLibrary.GetExport(CCAPIHandle, "CCAPIGetDllVersion");
+
+                UTF16HexTable = new byte[128];
+                UTF16HexTable[0x30] = 0x0;
+                UTF16HexTable[0x31] = 0x1;
+                UTF16HexTable[0x32] = 0x2;
+                UTF16HexTable[0x33] = 0x3;
+                UTF16HexTable[0x34] = 0x4;
+                UTF16HexTable[0x35] = 0x5;
+                UTF16HexTable[0x36] = 0x6;
+                UTF16HexTable[0x37] = 0x7;
+                UTF16HexTable[0x38] = 0x8;
+                UTF16HexTable[0x39] = 0x9;
+                UTF16HexTable[0x41] = 0xA;
+                UTF16HexTable[0x42] = 0xB;
+                UTF16HexTable[0x43] = 0xC;
+                UTF16HexTable[0x44] = 0xD;
+                UTF16HexTable[0x45] = 0xE;
+                UTF16HexTable[0x46] = 0xF;
+                UTF16HexTable[0x61] = 0xA;
+                UTF16HexTable[0x62] = 0xB;
+                UTF16HexTable[0x63] = 0xC;
+                UTF16HexTable[0x64] = 0xD;
+                UTF16HexTable[0x65] = 0xE;
+                UTF16HexTable[0x66] = 0xF;
             }
             else throw new IOException("[ERROR] Failed to load CCAPI!");
         }
@@ -226,7 +253,7 @@ public unsafe class CCAPI
 
     public int CCAPISetBootConsoleIds(ConsoleIdType type, bool disableBootId, ReadOnlySpan<byte> Id)
     {
-        if (Id.Length != 32)
+        if (Id.Length != 16)
         {
             return -1;
         }
@@ -239,7 +266,7 @@ public unsafe class CCAPI
 
     public int CCAPISetBootConsoleIds(ConsoleIdType type, bool disableBootId, byte[] Id)
     {
-        if (Id.Length != 32)
+        if (Id.Length != 16)
         {
             return -1;
         }
@@ -321,14 +348,10 @@ public unsafe class CCAPI
     public int CCAPIGetProcessList(Span<uint> pids)
     {
         uint npids;
-        if (CCAPIGetProcessListPtr(&npids, (uint*)nuint.Zero) == 0)
+        fixed (uint* ptrPids = pids)
         {
-            fixed (uint* ptrPids = pids)
-            {
-                return CCAPIGetProcessListPtr(&npids, ptrPids);
-            }
+            return CCAPIGetProcessListPtr(&npids, ptrPids);
         }
-        return -1;
     }
 
     public int CCAPIGetProcessListSafe(ref uint[]? pids)
@@ -408,15 +431,20 @@ public unsafe class CCAPI
             byte* ptrCcapi = stackalloc byte[4];
 
             ptrFw[0] = (byte)(((fw >> 24) & 0xF) + 0x30);
-            ptrFw[1] = 0x2E;
+            ptrFw[1] = 0x2E; // . in ASCII
             ptrFw[2] = (byte)(((fw >> 16) & 0xF) + 0x30);
             ptrFw[3] = (byte)(((fw >> 12) & 0xF) + 0x30);
+
             firmwareVersion = Encoding.ASCII.GetString(ptrFw, 4);
 
             cType = Enum.GetName(typeof(ConsoleType), ctype);
 
-            // Proper implementation needs to be done soon.
-            ccapiVersion = Convert.ToString(ccapi, 16);
+            ptrCcapi[0] = (byte)(((ccapi / 100) % 10) + 0x30);
+            ptrCcapi[1] = 0x2E;
+            ptrCcapi[2] = (byte)(((ccapi / 100) % 10) + 0x30);
+            ptrCcapi[3] = (byte)(((ccapi / 100) % 10) + 0x30);
+
+            ccapiVersion = Encoding.ASCII.GetString(ptrCcapi, 4);
 
         }
         else
@@ -430,10 +458,17 @@ public unsafe class CCAPI
 
     public int CCAPIVshNotify(NotifyIcon icon, string message)
     {
-        fixed (byte* ptrMessage = Encoding.ASCII.GetBytes(message))
+        int len = message.Length;
+        if (len > 200) return -1;
+
+        byte* ptrBMessage = stackalloc byte[len];
+
+        fixed (char* ptrMessage = message)
         {
-            return CCAPIVshNotifyPtr((int)icon, ptrMessage);
+            Encoding.ASCII.GetBytes(ptrMessage, len, ptrBMessage, len);
         }
+        return CCAPIVshNotifyPtr((int)icon, ptrBMessage);
+        
     }
 
     public int CCAPIGetNumberOfConsoles()
@@ -477,32 +512,6 @@ public unsafe class CCAPI
         return CCAPIGetDllVersionPtr();
     }
 
-    private readonly Dictionary<byte, byte> dict = new Dictionary<byte, byte>()
-    {
-            { 0x30, 0x0 },
-            { 0x31, 0x1 },
-            { 0x32, 0x2 },
-            { 0x33, 0x3 },
-            { 0x34, 0x4 },
-            { 0x35, 0x5 },
-            { 0x36, 0x6 },
-            { 0x37, 0x7 },
-            { 0x38, 0x8 },
-            { 0x39, 0x9 },
-            { 0x41, 0xA },
-            { 0x42, 0xB },
-            { 0x43, 0xC },
-            { 0x44, 0xD },
-            { 0x45, 0xE },
-            { 0x46, 0xF },
-            { 0x61, 0xA },
-            { 0x62, 0xB },
-            { 0x63, 0xC },
-            { 0x64, 0xD },
-            { 0x65, 0xE },
-            { 0x66, 0xF },
-    };
-
     // This works only for even string lengths, odd implementation will follow very soon.
     private void HexStringToByteArray(string input, byte* ptrToTarget)
     {
@@ -515,8 +524,8 @@ public unsafe class CCAPI
                 byte bLeft = (byte)ptrToInput[i];
                 byte bRight = (byte)ptrToInput[i + 1];
 
-                bLeft = dict[bLeft];
-                bRight = dict[bRight];
+                bLeft = UTF16HexTable[bLeft];
+                bRight = UTF16HexTable[bRight];
 
                 ptrToTarget[j] = (byte)((bLeft << 4) | bRight);
             }
